@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Погода по городу</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Общие стили */
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            color: #333;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Темная тема */
+        body.dark-mode {
+            background-color: #2c2c2c;
+            color: #ccc;
+        }
+
+        /* Контейнер */
+        .container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        /* Заголовок */
+        .header {
+            background-color: #333;
+            color: #fff;
+            padding: 15px;
+            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Кнопки */
+        .header button, .tabs button, .theme-switch {
+            background-color: #555;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 5px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        .header button:hover, .tabs button:hover, .theme-switch:hover {
+            background-color: #777;
+        }
+
+        /* Вкладки */
+        .tabs button.active {
+            background-color: #66a6ff;
+        }
+
+        /* Карточка погоды */
+        .weather-card {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .weather-card img {
+            width: 100px;
+            transition: transform 0.3s ease;
+        }
+
+        .weather-card img:hover {
+            transform: scale(1.1);
+        }
+
+        /* Анимация появления */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* График */
+        #chartContainer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        #chartContainer canvas {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        /* Прогноз */
+        #forecastContainer {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            width: 45%;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .day {
+            margin-bottom: 10px;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        h1, h2, h4 {
+            text-align: center;
+        }
+
+        .loading {
+            font-size: 18px;
+            color: #555;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button onclick="window.location.href='weather-home.html'">На главную</button>
+        <button onclick="toggleTheme()">Переключить тему</button>
+    </div>
+
+    <div class="container">
+        <h1>Погода по городу</h1>
+        <input type="text" id="cityInput" placeholder="Введите название города" />
+        <button onclick="getWeatherByCity()">Поиск по городу</button>
+
+        <div id="output" class="weather-card"></div>
+
+        <div class="tabs">
+            <button id="currentWeatherTab" class="active" onclick="showCurrentWeather()">Текущая погода</button>
+            <button id="forecastTab" onclick="showForecast()">Прогноз на 7 дней</button>
+        </div>
+
+        <div id="chartContainer">
+            <div id="chartDiv">
+                <canvas id="weatherChart"></canvas>
+            </div>
+            <div id="forecastContainer">
+                <h2>Прогноз на 7 дней</h2>
+                <div id="forecast"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+        }
+
+        async function getWeatherByCity() {
+            const output = document.getElementById('output');
+            const city = document.getElementById('cityInput').value;
+            if (!city) {
+                output.innerHTML = '<p class="error">Пожалуйста, введите название города.</p>';
+                return;
+            }
+
+            output.innerHTML = '<p class="loading">Загружаю погоду...</p>';
+
+            const apiKey = "63446311bc7babd8ad9ca3ae1586e19e";
+            const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&lang=ru&appid=${apiKey}`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Ошибка API: ${response.status}`);
+                const data = await response.json();
+
+                const temp = Math.round(data.main.temp);
+                const feelsLike = Math.round(data.main.feels_like);
+                const icon = `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`;
+
+                output.innerHTML = ` 
+                    <img src="${icon}" alt="Иконка погоды">
+                    <p><strong>Температура:</strong> ${temp} °C</p>
+                    <p><strong>Ощущается как:</strong> ${feelsLike} °C</p>
+                    <p><strong>Описание:</strong> ${data.weather[0].description}</p>
+                    <p><strong>Влажность:</strong> ${data.main.humidity}%</p>
+                    <p><strong>Скорость ветра:</strong> ${data.wind.speed} м/с</p>
+                `;
+
+                getWeatherForecast(data.coord.lat, data.coord.lon);
+            } catch (error) {
+                output.innerHTML = `<p class="error">Ошибка: ${error.message}</p>`;
+            }
+        }
+
+        async function getWeatherForecast(lat, lon) {
+            const apiKey = "63446311bc7babd8ad9ca3ae1586e19e";
+            const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&lang=ru&cnt=8&appid=${apiKey}`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Ошибка API: ${response.status}`);
+                const data = await response.json();
+
+                const labels = data.list.map(item => new Date(item.dt_txt).toLocaleTimeString());
+                const temps = data.list.map(item => Math.round(item.main.temp));
+                const daily = data.list.slice(0, 7);
+
+                displayForecastGraph(labels, temps);
+                display7DayForecast(daily);
+            } catch (error) {
+                console.error("Ошибка получения прогноза:", error);
+            }
+        }
+
+        function displayForecastGraph(labels, temps) {
+            const ctx = document.getElementById('weatherChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Температура (°C)',
+                        data: temps,
+                        borderColor: '#66a6ff',
+                        fill: false,
+                        borderWidth: 2,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Время'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Температура (°C)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function display7DayForecast(daily) {
+            const forecastDiv = document.getElementById('forecast');
+            forecastDiv.innerHTML = '';
+
+            daily.forEach((day) => {
+                const dayDate = new Date(day.dt_txt).toLocaleDateString();
+                const temp = Math.round(day.main.temp);
+                const description = day.weather[0].description;
+                const icon = `https://openweathermap.org/img/wn/${day.weather[0].icon}@2x.png`;
+
+                const dayDiv = document.createElement('div');
+                dayDiv.classList.add('day');
+                dayDiv.innerHTML = `
+                    <h4>${dayDate}</h4>
+                    <img src="${icon}" alt="Иконка погоды">
+                    <p><strong>Температура:</strong> ${temp} °C</p>
+                    <p><strong>Описание:</strong> ${description}</p>
+                `;
+                forecastDiv.appendChild(dayDiv);
+            });
+        }
+    </script>
+</body>
+</html>
